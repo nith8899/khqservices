@@ -2,6 +2,8 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { generateReference } from "./reference";
+import { storageMode } from "./mode";
+import { cfBindings } from "@/lib/cloudflare";
 
 /**
  * File-based private enquiry store.
@@ -52,7 +54,7 @@ export type IdempotencyClaim =
   | { state: "in-progress" };
 
 /** Atomically claim a submission id so repeat/double submissions are not stored twice. */
-export async function claimSubmission(submissionId: string): Promise<IdempotencyClaim> {
+async function fileClaim(submissionId: string): Promise<IdempotencyClaim> {
   const dir = path.join(dataDir(), "idempotency");
   await ensure(dir);
   const file = path.join(dir, `${safeSegment(submissionId)}.json`);
@@ -71,7 +73,7 @@ export async function claimSubmission(submissionId: string): Promise<Idempotency
   return { state: "in-progress" };
 }
 
-export async function releaseSubmission(submissionId: string) {
+async function fileRelease(submissionId: string) {
   const file = path.join(dataDir(), "idempotency", `${safeSegment(submissionId)}.json`);
   await fs.rm(file, { force: true });
 }
@@ -88,7 +90,7 @@ export interface SaveInput {
   files: { originalName: string; extension: string; bytes: Uint8Array }[];
 }
 
-export async function saveEnquiry(input: SaveInput): Promise<EnquiryRecord> {
+async function fileSave(input: SaveInput): Promise<EnquiryRecord> {
   const root = dataDir();
   const reference = generateReference(input.kind === "contact" ? "KHC" : "KHQ");
   const uploadDir = path.join(root, "uploads", reference);
@@ -126,7 +128,7 @@ export async function saveEnquiry(input: SaveInput): Promise<EnquiryRecord> {
   return record;
 }
 
-export async function recordNotifications(reference: string, notifications: NotificationState) {
+async function fileRecordNotifications(reference: string, notifications: NotificationState) {
   const file = path.join(dataDir(), "enquiries", `${safeSegment(reference)}.json`);
   try {
     const rec = JSON.parse(await fs.readFile(file, "utf8")) as EnquiryRecord;
@@ -136,3 +138,76 @@ export async function recordNotifications(reference: string, notifications: Noti
     /* non-fatal: the enquiry itself is already stored */
   }
 }
+
+// ---------------------------------------------------------------------------
+// Cloudflare backend: records and idempotency keys in KV, documents in private R2.
+// KV is eventually consistent, so the duplicate-submission guard is best-effort
+// across regions (the browser also blocks double-clicks).
+// ---------------------------------------------------------------------------
+
+const IDEM_PENDING_TTL = 120; // seconds; stale "pending" claims expire on their own
+
+async function cfClaim(submissionId: string): Promise<IdempotencyClaim> {
+  const { kv } = await cfBindings();
+  const key = `idem:${safeSegment(submissionId)}`;
+  const existing = await kv.get(key);
+  if (existing) {
+    const parsed = JSON.parse(existing) as { state: string; reference?: string };
+    return parsed.reference ? { state: "duplicate", reference: parsed.reference } : { state: "in-progress" };
+  }
+  await kv.put(key, JSON.stringify({ state: "pending" }), { expirationTtl: IDEM_PENDING_TTL });
+  return { state: "claimed" };
+}
+
+async function cfRelease(submissionId: string) {
+  const { kv } = await cfBindings();
+  await kv.delete(`idem:${safeSegment(submissionId)}`);
+}
+
+async function cfSave(input: SaveInput): Promise<EnquiryRecord> {
+  const { kv, files: bucket } = await cfBindings();
+  const reference = generateReference(input.kind === "contact" ? "KHC" : "KHQ");
+  const files: StoredFile[] = [];
+  for (const f of input.files) {
+    const storedName = `${randomBytes(12).toString("hex")}.${f.extension}`;
+    await bucket.put(`uploads/${reference}/${storedName}`, f.bytes);
+    files.push({ originalName: f.originalName, storedName, size: f.bytes.length, extension: f.extension });
+  }
+  const record: EnquiryRecord = {
+    reference,
+    kind: input.kind,
+    status: "New",
+    createdAt: new Date().toISOString(),
+    data: input.data,
+    files,
+  };
+  await kv.put(`enquiry:${reference}`, JSON.stringify(record));
+  await kv.put(
+    `idem:${safeSegment(input.submissionId)}`,
+    JSON.stringify({ state: "done", reference }),
+    { expirationTtl: 60 * 60 * 24 * 7 },
+  );
+  return record;
+}
+
+async function cfRecordNotifications(reference: string, notifications: NotificationState) {
+  try {
+    const { kv } = await cfBindings();
+    const key = `enquiry:${safeSegment(reference)}`;
+    const raw = await kv.get(key);
+    if (!raw) return;
+    const rec = JSON.parse(raw) as EnquiryRecord;
+    rec.notifications = notifications;
+    await kv.put(key, JSON.stringify(rec));
+  } catch {
+    /* non-fatal: the enquiry itself is already stored */
+  }
+}
+
+const isCf = () => storageMode() === "cloudflare";
+
+export const claimSubmission = (id: string) => (isCf() ? cfClaim(id) : fileClaim(id));
+export const releaseSubmission = (id: string) => (isCf() ? cfRelease(id) : fileRelease(id));
+export const saveEnquiry = (input: SaveInput) => (isCf() ? cfSave(input) : fileSave(input));
+export const recordNotifications = (ref: string, n: NotificationState) =>
+  isCf() ? cfRecordNotifications(ref, n) : fileRecordNotifications(ref, n);

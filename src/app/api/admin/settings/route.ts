@@ -1,10 +1,8 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { isAdmin, sameOrigin } from "@/lib/admin/auth";
-import { brandingDir, detectLogo, readStored, settingsSchema, writeStored, type LogoInfo } from "@/lib/settings";
+import { deleteLogoFile, detectLogo, readStored, saveLogoFile, settingsSchema, writeStored, type LogoInfo } from "@/lib/settings";
 import { flattenZodErrors } from "@/lib/validation/enquiry";
 
 export const dynamic = "force-dynamic";
@@ -39,13 +37,12 @@ export async function POST(request: Request) {
       return fail(400, "Logo must be a PNG, JPG, or WebP image of 2 MB or less.", { logo: "Unsupported or oversized image." });
     }
     const name = `logo-${randomBytes(8).toString("hex")}.${kind.ext}`;
-    await fs.mkdir(brandingDir(), { recursive: true });
-    await fs.writeFile(path.join(brandingDir(), name), bytes, { mode: 0o644 });
+    await saveLogoFile(name, bytes, kind.mime);
     logo = { file: name, mime: kind.mime, version: randomBytes(4).toString("hex") };
   }
 
   if (current.logo && current.logo.file !== logo?.file) {
-    await fs.rm(path.join(brandingDir(), path.basename(current.logo.file)), { force: true });
+    await deleteLogoFile(current.logo.file);
   }
 
   await writeStored({ ...parsed.data, logo });

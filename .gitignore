@@ -43,3 +43,8 @@ next-env.d.ts
 # private enquiry data & local env
 /.data
 .env*.local
+
+# cloudflare build output
+/.open-next
+/.wrangler
+.dev.vars

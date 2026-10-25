@@ -1,4 +1,3 @@
-import nodemailer from "nodemailer";
 import { siteConfig } from "@/config/site";
 
 export type EmailResult = "sent" | "skipped" | "failed";
@@ -10,10 +9,28 @@ export interface EmailMessage {
   replyTo?: string;
 }
 
+const resendConfigured = () => Boolean(process.env.RESEND_API_KEY && process.env.EMAIL_FROM);
+const smtpConfigured = () =>
+  Boolean(process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.EMAIL_FROM);
+
+/** Resend (HTTPS API, works on Cloudflare Workers) or SMTP (Node hosts). */
 export function emailConfigured(): boolean {
-  return Boolean(
-    process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS && process.env.EMAIL_FROM,
-  );
+  return resendConfigured() || smtpConfigured();
+}
+
+async function sendViaResend(msg: EmailMessage): Promise<EmailResult> {
+  const res = await fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${process.env.RESEND_API_KEY}`, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      from: process.env.EMAIL_FROM,
+      to: [msg.to],
+      subject: msg.subject,
+      text: msg.text,
+      reply_to: msg.replyTo,
+    }),
+  });
+  return res.ok ? "sent" : "failed";
 }
 
 /**
@@ -25,6 +42,8 @@ export function emailConfigured(): boolean {
 export async function sendEmail(msg: EmailMessage): Promise<EmailResult> {
   if (!emailConfigured()) return "skipped";
   try {
+    if (resendConfigured()) return await sendViaResend(msg);
+    const { default: nodemailer } = await import("nodemailer");
     const port = Number(process.env.SMTP_PORT || 587);
     const transport = nodemailer.createTransport({
       host: process.env.SMTP_HOST,

@@ -8,6 +8,9 @@ import { getSiteSettings } from "@/lib/settings";
 
 const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
 
+// Header/footer read admin-editable settings, so render per request (no stale static copies).
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url),
   title: {

@@ -3,6 +3,8 @@ import path from "node:path";
 import { settingsSchema, type EditableSettings } from "./settings-schema";
 import { siteConfig } from "@/config/site";
 import { dataDir } from "@/lib/enquiries/store";
+import { storageMode } from "@/lib/enquiries/mode";
+import { cfBindings } from "@/lib/cloudflare";
 
 export { settingsSchema, type EditableSettings };
 
@@ -23,8 +25,16 @@ export interface StoredSettings extends Partial<EditableSettings> {
 const file = () => path.join(dataDir(), "settings.json");
 export const brandingDir = () => path.join(dataDir(), "branding");
 
+const isCf = () => storageMode() === "cloudflare";
+const SETTINGS_KEY = "settings";
+
 export async function readStored(): Promise<StoredSettings> {
   try {
+    if (isCf()) {
+      const { kv } = await cfBindings();
+      const raw = await kv.get(SETTINGS_KEY);
+      return raw ? (JSON.parse(raw) as StoredSettings) : {};
+    }
     return JSON.parse(await fs.readFile(file(), "utf8")) as StoredSettings;
   } catch {
     return {};
@@ -32,8 +42,49 @@ export async function readStored(): Promise<StoredSettings> {
 }
 
 export async function writeStored(next: StoredSettings) {
+  if (isCf()) {
+    const { kv } = await cfBindings();
+    await kv.put(SETTINGS_KEY, JSON.stringify(next));
+    return;
+  }
   await fs.mkdir(dataDir(), { recursive: true });
   await fs.writeFile(file(), JSON.stringify(next, null, 2), { mode: 0o600 });
+}
+
+/** Logo bytes live in the data dir (file mode) or the R2 bucket (cloudflare mode). */
+export async function saveLogoFile(name: string, bytes: Uint8Array, mime: string) {
+  const safe = path.basename(name);
+  if (isCf()) {
+    const { files } = await cfBindings();
+    await files.put(`branding/${safe}`, bytes, { httpMetadata: { contentType: mime } });
+    return;
+  }
+  await fs.mkdir(brandingDir(), { recursive: true });
+  await fs.writeFile(path.join(brandingDir(), safe), bytes, { mode: 0o644 });
+}
+
+export async function readLogoFile(name: string): Promise<Uint8Array | null> {
+  const safe = path.basename(name);
+  try {
+    if (isCf()) {
+      const { files } = await cfBindings();
+      const obj = await files.get(`branding/${safe}`);
+      return obj ? new Uint8Array(await obj.arrayBuffer()) : null;
+    }
+    return new Uint8Array(await fs.readFile(path.join(brandingDir(), safe)));
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteLogoFile(name: string) {
+  const safe = path.basename(name);
+  if (isCf()) {
+    const { files } = await cfBindings();
+    await files.delete(`branding/${safe}`);
+    return;
+  }
+  await fs.rm(path.join(brandingDir(), safe), { force: true });
 }
 
 export interface ResolvedSettings {

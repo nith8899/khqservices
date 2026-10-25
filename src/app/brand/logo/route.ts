@@ -1,6 +1,4 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-import { brandingDir, readStored } from "@/lib/settings";
+import { readLogoFile, readStored } from "@/lib/settings";
 
 export const dynamic = "force-dynamic";
 
@@ -8,16 +6,13 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   const { logo } = await readStored();
   if (!logo) return new Response(null, { status: 404 });
-  try {
-    const data = await fs.readFile(path.join(brandingDir(), path.basename(logo.file)));
-    return new Response(new Uint8Array(data), {
-      headers: {
-        "Content-Type": logo.mime,
-        "X-Content-Type-Options": "nosniff",
-        "Cache-Control": "public, max-age=31536000, immutable",
-      },
-    });
-  } catch {
-    return new Response(null, { status: 404 });
-  }
+  const data = await readLogoFile(logo.file);
+  if (!data) return new Response(null, { status: 404 });
+  return new Response(new Uint8Array(data), {
+    headers: {
+      "Content-Type": logo.mime,
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "public, max-age=31536000, immutable",
+    },
+  });
 }
