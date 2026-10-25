@@ -1,0 +1,46 @@
+# Render Blueprint — free web service. Secrets are entered in the Render dashboard, never committed.
+services:
+  - type: web
+    name: khq-services-website
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: NEXT_PUBLIC_SITE_URL
+        value: https://khqservices.com.kh
+      - key: ENQUIRY_STORAGE
+        value: file
+      - key: ENQUIRY_DATA_DIR
+        value: /tmp/khq-data   # ephemeral on the free plan: wiped on restart/redeploy
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        value: 587
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: NOTIFY_EMAIL_TO
+        sync: false
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD_HASH
+        sync: false
+      - key: ADMIN_SESSION_SECRET
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_EMAIL
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_PHONE
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_MESSAGING
+        sync: false
+      - key: NEXT_PUBLIC_CONTACT_ADDRESS
+        sync: false
+      - key: NEXT_PUBLIC_BUSINESS_HOURS
+        sync: false
