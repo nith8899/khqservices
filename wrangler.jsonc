@@ -1,16 +1,41 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "khqservices",
-  "main": ".open-next/worker.js",
-  "compatibility_date": "2026-09-01",
-  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
-  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
-  "services": [{ "binding": "WORKER_SELF_REFERENCE", "service": "khqservices" }],
-  "vars": {
-    "ENQUIRY_STORAGE": "cloudflare",
-    "MAX_UPLOAD_MB": "10"
-  },
-  // Omitting ids lets `wrangler deploy` create these resources automatically on first deploy.
-  "kv_namespaces": [{ "binding": "KHQ_KV" }],
-  "r2_buckets": [{ "binding": "KHQ_FILES", "bucket_name": "khq-private-files" }]
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "khqservices",
+	"main": ".open-next/worker.js",
+	"compatibility_date": "2026-09-01",
+	"compatibility_flags": [
+		"nodejs_compat",
+		"global_fetch_strictly_public"
+	],
+	"assets": {
+		"directory": ".open-next/assets",
+		"binding": "ASSETS"
+	},
+	"services": [
+		{
+			"binding": "WORKER_SELF_REFERENCE",
+			"service": "khqservices"
+		}
+	],
+	"vars": {
+		"ENQUIRY_STORAGE": "cloudflare",
+		"MAX_UPLOAD_MB": "10"
+	},
+	// Omitting ids lets `wrangler deploy` create these resources automatically on first deploy.
+	"kv_namespaces": [
+		{
+			"binding": "KHQ_KV",
+			"id": "1c33633a9f024870825e2f2180084ba8"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "KHQ_FILES",
+			"bucket_name": "khq-private-files"
+		},
+		{
+			"bucket_name": "khq-private-files",
+			"binding": "khq_private_files"
+		}
+	]
 }
