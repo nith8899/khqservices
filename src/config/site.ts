@@ -19,13 +19,13 @@ export const siteConfig = {
   altTagline: "Moving Your Business Forward.",
   description:
     "KHQ Services helps businesses coordinate freight, imports, equipment transportation, and commercial deliveries into Cambodia with practical planning and responsive service.",
-  url: env(process.env.NEXT_PUBLIC_SITE_URL, "http://localhost:3000"),
+  url: env(process.env.NEXT_PUBLIC_SITE_URL, "https://khqservices.com.kh"),
   locale: "en",
   /** Languages the content layer is structured for. Khmer requires reviewed copy. */
   supportedLocales: ["en"] as const,
 
   contact: {
-    email: env(process.env.NEXT_PUBLIC_CONTACT_EMAIL, "[Business email to be supplied]"),
+    email: env(process.env.NEXT_PUBLIC_CONTACT_EMAIL, "info@khqservices.com.kh"),
     phone: env(process.env.NEXT_PUBLIC_CONTACT_PHONE, "[Telephone to be supplied]"),
     messaging: env(
       process.env.NEXT_PUBLIC_CONTACT_MESSAGING,

@@ -82,7 +82,7 @@ Visit `/admin`. Admins can change the logo, email, phone, messaging contact, add
 Setup (the admin is disabled until all three variables are set):
 
 ```bash
-npm run admin:hash -- "147ba39583b64d6c08a2c7f802998fe4:68eb006d65dd44569c04b6e140d7762472d3005124eea2155a2ff47bb19dae43dfacfccb9ec70a91fdbdcb27e88e466618a9e2f4f64787b3259fdb34c022166c"
+npm run admin:hash -- "your password (at least 12 characters)"
 ```
 
 Copy the two printed lines (`ADMIN_PASSWORD_HASH`, `ADMIN_SESSION_SECRET`) into `.env.local`, add `ADMIN_USERNAME=admin`, then restart. The plain password is never stored.
