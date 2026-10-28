@@ -11,11 +11,15 @@ import {
 } from "@/content/en";
 import { pageMetadata } from "@/lib/metadata";
 
-export const metadata: Metadata = pageMetadata(
-  "Logistics Company in Cambodia — Freight, Import & Delivery Coordination",
-  "KHQ Services coordinates freight, imports, equipment transportation, and business delivery services into Cambodia for manufacturing, IT, and public-sector customers.",
-  "/",
-);
+export const metadata: Metadata = {
+  ...pageMetadata(
+    "Logistics Company in Cambodia — Freight, Import & Delivery Coordination",
+    "KHQ Services coordinates freight, imports, equipment transportation, and business delivery services into Cambodia for manufacturing, IT, and public-sector customers.",
+    "/",
+  ),
+  // Browser tab title for the home page.
+  title: { absolute: "KHQ Services" },
+};
 
 export default function HomePage() {
   return (
